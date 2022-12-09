@@ -3,7 +3,8 @@ import { document } from '../utils/dynamodbClient'
 import { compile } from 'handlebars'
 import { join } from 'path'
 import { readFileSync } from 'fs'
-import * as dayjs from 'dayjs'
+import dayjs from 'dayjs'
+import chromium from "chrome-aws-lambda"
 interface ICreateCertificate {
    id: string
    name: string
@@ -54,7 +55,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       medal
    }
 
-   const content = await compileTemplate(data)
+   const content = await compileTemplate(data);
+
+   const browser = await chromium.puppeteer.launch({
+      userDataDir: '/dev/null',
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+   });
+
+   const page = await browser.newPage();
+
+   await page.setContent(content);
+
+   const pdf = await page.pdf({
+      format: 'a4',
+      landscape: true,
+      path: process.env.IS_OFFLINE ? 'certificate.pdf' : null,
+      printBackground: true,
+      preferCSSPageSize: true,
+   });
+
+   await browser.close();
 
    return {
       statusCode: 201,
